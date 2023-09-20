@@ -1,30 +1,32 @@
 #ifndef SERVER_H
 #define SERVER_H
 
-#include"pch.h"
+#include"../shared/Connection.h"
+#include"../shared/Serialize.h"
 
-class Server
+class Server 
 {
 public:
-    Server();
+    Server(uint16_t port);
     ~Server();
 
-    void AcceptClient();
-
-    Server(const Server& other) = delete;
-    Server& operator=(const Server& other) = delete;
-
+    bool Start();
+    void WaitForClientConnection();
+    void Update(size_t nMaxMessages = -1);
+    void Stop();
+    void MessageClient(std::shared_ptr<Connection> client, const std::string& msg);
+   
 private:
-    void CreateSocket();
-    void BindSocket();
-    void Listen();
+    asio::io_context m_asioContext;
 
-private:
-    int serverSock;
-    int clientSock;
-    sockaddr_in serverAddr;
-    sockaddr_in clientAddr;
-    socklen_t clientAddrLen;
+    std::shared_ptr<Connection> m_connection;
+
+    std::thread m_threadContext;
+    std::mutex m_mtx;
+    
+    asio::ip::tcp::acceptor m_asioAcceptor;
+
+    std::deque<std::string> m_qMsgIn;
 };
 
 #endif // !SERVER_H

@@ -4,6 +4,9 @@ project(ServerClientApp)
 # Set C++ standard to C++17
 set(CMAKE_CXX_STANDARD 17)
 
+# Find Boost
+find_package(Boost REQUIRED)
+
 # Add executable for the server
 add_executable(Server
     src/server/Server.cpp
@@ -28,6 +31,10 @@ target_include_directories(Client PRIVATE
     include
     src/shared
 )
+
+# Link Boost to executables
+target_link_libraries(Server PRIVATE Boost::Boost)
+target_link_libraries(Client PRIVATE Boost::Boost)
 
 # Set the output directory for the executables 
 set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR}/bin)

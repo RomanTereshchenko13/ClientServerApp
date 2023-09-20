@@ -1,15 +1,24 @@
 #ifndef PCH_H
 #define PCH_H
 
-#include<sys/socket.h>
-#include<netinet/in.h>
-#include<cstdlib>
-#include<csignal> 
-#include<cstring>
 #include<iostream>
-#include<unistd.h>
-#include<arpa/inet.h>
+#include<string>
+#include<vector>
+#include<deque>
 #include<thread>
+#include<mutex>
+#include<filesystem>
+
+#include<boost/serialization/vector.hpp>
+#include<boost/archive/text_oarchive.hpp>
+#include<boost/archive/text_iarchive.hpp>
+#include<boost/asio.hpp>
+#include<boost/asio/ts/buffer.hpp>
+#include<boost/asio/ts/internet.hpp>
+
+using namespace boost;
+
+namespace fs = std::filesystem;
 
 #endif // !PCH.h
 

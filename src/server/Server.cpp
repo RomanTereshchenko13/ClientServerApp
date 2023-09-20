@@ -1,78 +1,94 @@
 #include "Server.h"
-#include "Server.h"
 
-#define SERVER_PORT 7500
-#define FILE_TRANSFER_PORT 7505
-#define MAX_BUFFER_SIZE 1024
-
-Server::Server()
-{
-    CreateSocket();
-    BindSocket();
-    Listen();
-}
+Server::Server(uint16_t port)
+    : m_asioAcceptor(m_asioContext, boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), port))
+{}
 
 Server::~Server()
 {
-    std::cout << "Server Destructor called\n";
-    close(serverSock);
+    Stop();
 }
 
-void Server::AcceptClient()
+bool Server::Start()
 {
-    clientAddrLen = sizeof(clientAddr);
-    clientSock = accept(serverSock, (sockaddr*)&clientAddr, &clientAddrLen);
-    if (clientSock < 0)
+    try
     {
-        std::cerr << "Error: " << strerror(errno) << std::endl;
-        exit(1);
+        WaitForClientConnection();
+        m_threadContext = std::thread([this]() { m_asioContext.run(); });
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << "[SERVER] Exception: " << e.what() << '\n';
+        return false;
     }
 
-    // Receive the list of files from the client
-    char file_list[MAX_BUFFER_SIZE];
-    memset(file_list, 0, sizeof(file_list));
-    ssize_t bytesReceived = recv(clientSock, file_list, sizeof(file_list), 0);
-
-    if (bytesReceived == -1) {
-        perror("Error receiving file list from client");
-        exit(EXIT_FAILURE);
-    }
-
-    std::cout << "Received file list from client: " << file_list << std::endl;
+    std::cout << "[SERVER] Started!\n";
+    return true;
 }
 
-//Private methods to create serverSocket
-void Server::CreateSocket()
+void Server::WaitForClientConnection()
 {
-    serverSock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (serverSock < 0)
-    {
-        std::cerr << "Error: " << strerror(errno) << std::endl;
-        exit(1);
-    }
+    m_asioAcceptor.async_accept(
+        [this](std::error_code ec, boost::asio::ip::tcp::socket socket)
+        {
+            if(!ec)
+            {
+                std::cout << "[SERVER] New Connection: " << socket.remote_endpoint() << "\n";
 
-    serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port = htons(SERVER_PORT);
-    serverAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+                // Create a new connection to handle this client 
+                m_connection = 
+                    std::make_shared<Connection>(Connection::Owner::server, m_asioContext, std::move(socket));
+                
+                m_connection->ConnectToClient();
+
+                std::cout << "Connection Approved\n";  
+            }
+            else
+			{
+				// Error has occurred during acceptance
+				std::cout << "[SERVER] New Connection Error: " << ec.message() << "\n";
+			}
+
+            WaitForClientConnection();
+        }
+    );
 }
 
-void Server::BindSocket()
+void Server::Update(size_t nMaxMessages)
 {
-    if (bind(serverSock, (struct sockaddr*) &serverAddr, sizeof(serverAddr)))
+    size_t nMessageCount = 0;
+    while(nMessageCount < nMaxMessages && !m_qMsgIn.empty())
     {
-        std::cerr << "Error: " << strerror(errno) << std::endl;
-        exit(1);
+        //Grab the fron message
+        std::scoped_lock lock(m_mtx);
+        auto msg = m_qMsgIn.front();
+        m_qMsgIn.pop_front();
+
+        std::cout << msg << std::endl;
+
+        // //Pass to message handler
+        // OnMessage(msg.remote, msg.msg); // - interface for file requesting?
+
+        nMessageCount++;
     }
 }
 
-void Server::Listen()
+void Server::Stop()
 {
-    if (listen(serverSock, 5) < 0)
+    //Request the context to close
+    m_asioContext.stop();
+
+    //Tidy up the context thread
+    if (m_threadContext.joinable()) m_threadContext.join();
+
+    //Inform someone
+    std::cout << "[SERVER] Stopped!\n";
+}
+
+void Server::MessageClient(std::shared_ptr<Connection> client, const std::string &msg)
+{
+    if(client && client->IsConnected())
     {
-        std::cerr << "Error: " << strerror(errno) << std::endl;
-        exit(1);
+        client->Send(msg);
     }
-
-    std::cout << "Server is listening on port " << SERVER_PORT << std::endl;
-
 }

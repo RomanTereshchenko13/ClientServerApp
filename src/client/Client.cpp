@@ -1,45 +1,90 @@
 #include "Client.h"
 
-#define SERVER_ADDRESS "127.0.0.1"
-#define SERVER_PORT 7500
-#define FILE_TRANSFER_PORT 7505
-#define MAX_BUFFER_SIZE 1024
-
-Client::Client()
+Client::Client() : m_socket(m_context)
 {
-    CreateSocket();
-    Connect();
+    FillVector();
+    std::cout << "Client created!\n!";
 }
 
-void Client::SendMessage()
+Client::~Client()
 {
-    std::string file_list = "file1.txt;file2.txt;file3.txt";
-    if (send(clientSocket, file_list.c_str(), file_list.size(), 0) == -1) 
-    {
-        perror("Error sending file list to server");
-        exit(EXIT_FAILURE);
-    }
+    Disconnect();
 }
 
-void Client::CreateSocket()
+void Client::Connect(std::string host, const uint16_t port)
 {
-    clientSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (clientSocket < 0)
+    //Resolve hostname/ip-address into tangiable physical address
+    asio::ip::tcp::resolver resolver(m_context);
+    asio::ip::tcp::resolver::results_type endpoints = resolver.resolve(host, std::to_string(port));
+
+    //Create connection
+    m_connection = std::make_unique<Connection>(m_context, asio::ip::tcp::socket(m_context));
+
+    //Tell connection object to connect to server
+    m_connection->ConnectToServer(endpoints);
+
+    // Start Context Thread
+	m_thrContext = std::thread([this]() { m_context.run(); });
+
+    if(m_connection->IsConnected())
     {
-        std::cerr << "Error: " << strerror(errno) << std::endl;
-        exit(1);
+        std::cout << "Connected!\n";
+    }
+    else
+    {
+        std::cout << "Error, can`t connect!\n";
     }
 
-    serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port = htons(SERVER_PORT);
-    serverAddr.sin_addr.s_addr = inet_addr(SERVER_ADDRESS);
+    //Serialize the list of files
+    std::string serializedData = srlz::serialize(m_vectorOfFiles);
+
+    //Send serialized data to server
+    m_connection->Send(serializedData);
 }
 
-void Client::Connect()
+void Client::Disconnect()
 {
-    if (connect(clientSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) == -1) 
-    {
-        perror("Error connecting to server");
-        exit(EXIT_FAILURE);
+    // If connection exists, and it's connected then...
+	if(IsConnected())
+	{
+	// ...disconnect from server gracefully
+		m_connection->Disconnect();
     }
+
+	// Either way, we're also done with the asio context...				
+	m_context.stop();
+	// ...and its thread
+	if (m_thrContext.joinable())
+		m_thrContext.join();
+
+	// Destroy the connection object
+	m_connection.release();
+}
+
+bool Client::IsConnected()
+{
+    if(m_connection)
+        return m_connection->IsConnected();
+    else 
+        return false;
+}
+
+void Client::FillVector()
+{
+    std::string pathToFiles = fs::current_path().string() + "/files";
+    try
+    {
+        for (const auto& entry : fs::directory_iterator(pathToFiles))
+        {
+            if(entry.is_regular_file())
+            {
+                m_vectorOfFiles.push_back(entry.path().filename());
+            }
+        }
+    }
+    catch(const std::exception& ec)
+    {
+        std::cerr << "Error during creation of list of files: " << ec.what() << '\n';
+    }
+    
 }
