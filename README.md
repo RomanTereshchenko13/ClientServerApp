@@ -4,15 +4,15 @@ This repository contains an example of a simple TCP Client-Server application us
 
 # Features
 
-    Uses Boost Asio for networking
-    Built with CMake
-    Includes logging with Boost Log
+Uses Boost Asio for networking
+Built with CMake
+Includes logging with Boost Log
 
 # Requirements
 
-    C++17 compiler
-    CMake 3.12 or higher
-    Boost Libraries (Asio, Log, etc.)
+C++17 compiler
+CMake 3.12 or higher
+Boost Libraries (Asio, Log, etc.)
 
 # Building the Project
 
@@ -37,7 +37,7 @@ This repository contains an example of a simple TCP Client-Server application us
 
     make
 
-    You will find the client and server executables in the build directory.
+You will find the client and server executables in the build directory.
 
 # Usage
 
