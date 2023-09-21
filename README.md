@@ -13,6 +13,7 @@ This repository contains an example of a simple TCP Client-Server application us
 - C++17 compiler
 - CMake 3.12 or higher
 - Boost Libraries (Asio, Log, etc.)
+- Ubuntu 22.04
 
 # Building the Project
 
