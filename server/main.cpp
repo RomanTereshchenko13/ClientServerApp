@@ -6,10 +6,11 @@
 #include "../shared/pch.h"
 #include "../shared/logger.h"
 
+
 int main(int argc, char* argv[])
 {
-    if (argc != 3) {
-        std::cerr << "Usage: server <port> <workDirectory>\n";
+    if (argc != 2) {
+        std::cerr << "Usage: server <workDirectory>\n";
         return 1;
     }
 
@@ -18,12 +19,14 @@ int main(int argc, char* argv[])
     try {
         boost::asio::io_context IoContext;
 
-        Server server(IoContext, std::stoi(argv[1]), argv[2]);
+        Server server(IoContext, argv[1]);
 
         IoContext.run();
+
     } catch (std::exception& e) {
         std::cerr << "Exception: " << e.what() << "\n";
     }
 
+    
     return 0;
 }

@@ -5,10 +5,10 @@
 
 #include "client.h"
 
-Client::Client(IoContext& t_IoContext, TcpResolverIterator t_endpointIterator, 
+Client::Client(IoContext& t_IoContext, TcpResolverIterator t_mainEndpointIterator, TcpResolverIterator t_fileEndpointIterator,
     std::string const& t_path)
-    : m_TcpResolver(t_IoContext), m_mainSocket(t_IoContext), m_fileSocket(t_IoContext),
-    m_endpointIterator(t_endpointIterator), m_path(t_path)
+    : m_TcpResolver(t_IoContext), m_IoContext(t_IoContext), m_mainSocket(t_IoContext), m_fileSocket(t_IoContext),
+    m_mainEndpointIterator(t_mainEndpointIterator), m_fileEndpointIterator(t_fileEndpointIterator), m_path(t_path)
 {
     doConnect();
 }
@@ -16,14 +16,30 @@ Client::Client(IoContext& t_IoContext, TcpResolverIterator t_endpointIterator,
 //1
 void Client::doConnect()
 {
-    boost::asio::async_connect(m_mainSocket, m_endpointIterator, 
+    boost::asio::async_connect(m_mainSocket, m_mainEndpointIterator, 
         [this](boost::system::error_code ec, TcpResolverIterator)
         {
             if (!ec) {
                 sendList();
-                BOOST_LOG_TRIVIAL(info) << "Connected to server...";
+                BOOST_LOG_TRIVIAL(info) << "[Port: 7500] Connected to server...";
             } else {
-                std::cout << "Coudn't connect to host. Please run server "
+                std::cout << "[Port: 7500]  Coudn't connect to host. Please run server "
+                    "or check network connection.\n";
+                BOOST_LOG_TRIVIAL(error) << "Error: " << ec.message();
+            }
+        });
+}
+
+void Client::doFileTransferConnect()
+{
+    boost::asio::async_connect(m_fileSocket, m_fileEndpointIterator,
+        [this](boost::system::error_code ec, TcpResolverIterator)
+        {
+            if (!ec) {
+                waitForServerRequest();
+                BOOST_LOG_TRIVIAL(info) << "[Port: 7505] Connected to server...";
+            } else {
+                std::cout << "[Port: 7505] Coudn't connect to host. Please run server "
                     "or check network connection.\n";
                 BOOST_LOG_TRIVIAL(error) << "Error: " << ec.message();
             }
@@ -33,10 +49,10 @@ void Client::doConnect()
 //2
 void Client::sendList()
 {
-    m_listOfFiles = generateFileList(); // Assuming m_path is the directory path
+    m_listOfFiles = generateFileList();
     std::ostream os(&m_request);
     os << m_listOfFiles;
-    os << m_listOfFiles << "\n" << m_listOfFiles.size() << "\n\n";
+    os << m_listOfFiles << "\n" << m_listOfFiles.size();
     BOOST_LOG_TRIVIAL(trace) << "Request size: " << m_request.size();
     boost::asio::async_write(m_mainSocket, boost::asio::buffer(m_listOfFiles.data(), m_listOfFiles.size()),
     [this](boost::system::error_code ec, size_t /*length*/) {
@@ -49,6 +65,7 @@ void Client::sendList()
             BOOST_LOG_TRIVIAL(error) << "Error sending list of files: " << ec.message();
         }
     });
+    doFileTransferConnect();
 }
 
 //3
@@ -76,16 +93,24 @@ std::string Client::generateFileList() {
 //4
 // Wait for the server's request for a specific file
 void Client::waitForServerRequest() {
-    boost::asio::async_read(m_mainSocket,
-        boost::asio::buffer(m_buf),
+    
+    // Assuming m_request is a boost::asio::streambuf
+    boost::asio::async_read_until(m_fileSocket, m_fileRequestBuf, "\n",
         [this](boost::system::error_code ec, size_t /*length*/)
         {
             if (!ec) {
-                std::string requestedFile = std::string(m_buf.data());
-                std::cout << requestedFile << "Requested\n";
+                std::istream is(&m_fileRequestBuf);
+                std::string requestedFile;
+                std::getline(is, requestedFile, '\n');
+                // Do something with requestedFile
+                std::cout << "Requested file: " << requestedFile << std::endl;
+
                 // Send the requested file to the server on a different port
-                openFile(requestedFile);
+                // Open the file and populate m_request with its contents
+                fs::path fullPath = "files_to_send/" + requestedFile;
+                openFile(fullPath);
                 writeBuffer(m_request);
+                // Send the contents of m_request to the server
             } else {
                 BOOST_LOG_TRIVIAL(error) << "Error: " << ec.message();
             }

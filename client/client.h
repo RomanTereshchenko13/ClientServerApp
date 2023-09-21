@@ -16,8 +16,8 @@ public:
     using TcpResolverIterator = TcpResolver::iterator;
     using TcpSocket = boost::asio::ip::tcp::socket;
 
-    Client(IoContext& t_IoContext, TcpResolverIterator t_endpointIterator, 
-        std::string const& t_path);
+    Client(IoContext& t_IoContext, TcpResolverIterator t_mainEndpointIterator, 
+    TcpResolverIterator t_fileEndpointIterator, std::string const& t_path);
     void sendList();
     void handleServerRequest();
 private:
@@ -25,6 +25,7 @@ private:
     void waitForServerRequest();
     void openFile(std::string const& t_path);
     void doConnect();
+    void doFileTransferConnect();
     void doWriteFile(const boost::system::error_code& t_ec);
     
     template<typename Buffer>
@@ -32,12 +33,15 @@ private:
 
 
     TcpResolver m_TcpResolver;
+    IoContext& m_IoContext;
     TcpSocket m_mainSocket;
     TcpSocket m_fileSocket;
-    TcpResolverIterator m_endpointIterator;
+    TcpResolverIterator m_mainEndpointIterator;
+    TcpResolverIterator m_fileEndpointIterator;
     enum { MessageSize = 1024 };
     std::array<char, MessageSize> m_buf;
     boost::asio::streambuf m_request;
+    boost::asio::streambuf m_fileRequestBuf;
     std::ifstream m_sourceFile;
     std::string m_path;
     std::string m_listOfFiles;
@@ -46,7 +50,7 @@ private:
 template<typename Buffer>
 void Client::writeBuffer(Buffer& t_buffer)
 {
-    boost::asio::async_write(m_mainSocket,
+    boost::asio::async_write(m_fileSocket,
         t_buffer,
         [this](boost::system::error_code ec, size_t /*length*/)
         {

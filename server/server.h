@@ -7,8 +7,6 @@
 #include <boost/asio.hpp>
 #include <filesystem>
 
-
-
 class Connection
     : public std::enable_shared_from_this<Connection>
 {
@@ -19,10 +17,11 @@ public:
 
     void start()
     {
-        doRead();
+        doFileListRead();
     }
 
     void handleFileList(size_t bytes);
+    void requestSpecificFile();
 
 private:
     void doRead();
@@ -31,8 +30,7 @@ private:
     void readData(std::istream &stream);
     void doReadFileContent(size_t t_bytesTransferred);
     void handleError(std::string const& t_functionName, boost::system::error_code const& t_ec);
-    void requestSpecificFile(const std::string& fileList);
-    void readUntilFileListDelimiter();
+    void doFileListRead();
 
     TcpSocket m_socket;
     enum { MaxLength = 40960 };
@@ -50,16 +48,20 @@ class Server
 public:
     using TcpSocket = boost::asio::ip::tcp::socket;
     using TcpAcceptor = boost::asio::ip::tcp::acceptor;
+    using TcpEndPoint = boost::asio::ip::tcp::endpoint;
     using IoContext = boost::asio::io_context;
 
-    Server(IoContext& t_IoContext, short t_port, std::string const& t_workDirectory);
+    Server(IoContext& t_IoContext, std::string const& t_workDirectory);
+    void doFileRequestAccept();
 
 private:
     void doAccept();
     void createWorkDirectory();
 
     TcpSocket m_socket;
+    TcpSocket m_fileSocket;
     TcpAcceptor m_acceptor;
-
+    TcpAcceptor m_fileRequestAcceptor;
+    IoContext& m_ioContext;
     std::string m_workDirectory;
 };

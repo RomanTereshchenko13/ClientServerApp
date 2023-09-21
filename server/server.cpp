@@ -10,19 +10,17 @@ Connection::Connection(TcpSocket t_socket)
 {
 }
 
-
 void Connection::doRead()
 {
-    readUntilFileListDelimiter();
-    // auto self = shared_from_this();
-    // async_read_until(m_socket, m_requestBuf_, "\n\n",
-    //     [this, self](boost::system::error_code ec, size_t bytes)
-    //     {
-    //         if (!ec)
-    //             processRead(bytes);
-    //         else
-    //             handleError(__FUNCTION__, ec);
-    //     });
+    auto self = shared_from_this();
+    async_read_until(m_socket, m_requestBuf_, "\n\n",
+        [this, self](boost::system::error_code ec, size_t bytes)
+        {
+            if (!ec)
+                processRead(bytes);
+            else
+                handleError(__FUNCTION__, ec);
+        });
 }
 
 void Connection::processRead(size_t t_bytesTransferred)
@@ -58,7 +56,6 @@ void Connection::processRead(size_t t_bytesTransferred)
         }
     );
 }
-
 
 void Connection::readData(std::istream &stream)
 {
@@ -108,32 +105,20 @@ void Connection::handleError(std::string const& t_functionName, boost::system::e
         << t_ec << " " << t_ec.message() << std::endl;
 }
 
-
-Server::Server(IoContext& t_IoContext, short t_port, std::string const& t_workDirectory)
-    : m_socket(t_IoContext),
-    m_acceptor(t_IoContext, boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), t_port)),
+Server::Server(IoContext& t_IoContext, std::string const& t_workDirectory)
+    : m_socket(t_IoContext), m_ioContext(t_IoContext), m_fileSocket(t_IoContext),
+    m_acceptor(t_IoContext, TcpEndPoint(boost::asio::ip::tcp::v4(), 7500)),
+    m_fileRequestAcceptor(t_IoContext, TcpEndPoint(boost::asio::ip::tcp::v4(), 7505)), 
     m_workDirectory(t_workDirectory)
 {
     std::cout << "Server started\n";
 
     createWorkDirectory();
-
     doAccept();
+    doFileRequestAccept();
 }
 
-
-void Server::doAccept()
-{
-    m_acceptor.async_accept(m_socket,
-        [this](boost::system::error_code ec)
-    {
-        if (!ec)
-            std::make_shared<Connection>(std::move(m_socket))->start();
-
-        doAccept();
-    });
-}
-
+//1
 void Server::createWorkDirectory()
 {
     namespace fs = std::filesystem;
@@ -143,8 +128,32 @@ void Server::createWorkDirectory()
     current_path(currentPath);
 }
 
+//2
+void Server::doAccept()
+{
+    m_acceptor.async_accept(m_socket,
+        [this](boost::system::error_code ec)
+    {
+        BOOST_LOG_TRIVIAL(trace) << "Accepted client: " << m_socket.remote_endpoint() << " on :" << m_socket.local_endpoint().port();
+        if (!ec)
+            std::make_shared<Connection>(std::move(m_socket))->start();
+        doAccept();
+    });
+}
 
-void Connection::readUntilFileListDelimiter()
+void Server::doFileRequestAccept()
+{
+    m_fileRequestAcceptor.async_accept(m_fileSocket, 
+        [this](boost::system::error_code ec) 
+        {
+            BOOST_LOG_TRIVIAL(trace) << "Accepted client: " << m_fileSocket.remote_endpoint() << " on :" << m_fileSocket.local_endpoint().port();
+            if (!ec)
+                std::make_shared<Connection>(std::move(m_fileSocket))->requestSpecificFile();
+            doFileRequestAccept();
+        });
+}
+
+void Connection::doFileListRead()
 {
     auto self = shared_from_this();
     boost::asio::async_read_until(m_socket, m_requestBuf_, "\n\n",
@@ -164,23 +173,32 @@ void Connection::handleFileList(size_t bytes)
     << ", in_avail = " << m_requestBuf_.in_avail() << ", size = " 
     << m_requestBuf_.size() << ", max_size = " << m_requestBuf_.max_size() << ".";
     std::istream requestStream(&m_requestBuf_);
-    std::string line;
-    while (std::getline(requestStream, line)) {
-        if (line.empty()) {
+    while (std::getline(requestStream, m_fileList)) 
+    {
+        if (m_fileList.empty()) {
             break;
         }
-        std::cout << "List of files received: " << line << std::endl;
     }
-
-    requestSpecificFile(line);
-
+    std::cout << "Files received: " << m_fileList << std::endl;
 }
 
-void Connection::requestSpecificFile(const std::string& fileList)
+void Connection::requestSpecificFile()
 {
-    std::cout << "Enter the name of the file you wish to request: ";
-    std::string fileName;
-    std::cin >> fileName;
-
-    boost::asio::write(m_socket, boost::asio::buffer(fileName + "\n"));
+    std::string name;
+    std::cout << "Enter the name of the file to request: ";
+    std::cin >> name;
+    // Send the request to the client.
+    boost::asio::async_write(m_socket,
+    boost::asio::buffer(name + "\n\n"),
+    [this](boost::system::error_code ec, size_t /*length*/)
+    {
+        if (!ec) 
+        {
+            doRead();
+        } 
+        else 
+        {
+            handleError(__FUNCTION__, ec);
+        }
+    });
 }
