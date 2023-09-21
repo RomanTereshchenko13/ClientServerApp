@@ -54,4 +54,4 @@ To run the client:
 
     ./client <server_address>
 
-Replace <server_address> with the IP address or domain name of the server.
+Replace <server_address> with the IP address of the server.
