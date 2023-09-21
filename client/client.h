@@ -1,10 +1,6 @@
 #ifndef CLIENT_H
 #define CLIENT_H
 
-#include <array>
-#include <fstream>
-#include <filesystem>
-#include <boost/asio.hpp>
 
 namespace fs = std::filesystem;
 
@@ -45,6 +41,7 @@ private:
     std::ifstream m_sourceFile;
     std::string m_path;
     std::string m_listOfFiles;
+    std::string pathToFiles;
 };
 
 template<typename Buffer>

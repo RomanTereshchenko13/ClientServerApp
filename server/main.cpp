@@ -9,17 +9,12 @@
 
 int main(int argc, char* argv[])
 {
-    if (argc != 2) {
-        std::cerr << "Usage: server <workDirectory>\n";
-        return 1;
-    }
-
     Logger::instance().setOptions("server_%3N.log", 1 * 1024 * 1024, 10 * 1024 * 1024);
 
     try {
         boost::asio::io_context IoContext;
 
-        Server server(IoContext, argv[1]);
+        Server server(IoContext);
 
         IoContext.run();
 
@@ -27,6 +22,5 @@ int main(int argc, char* argv[])
         std::cerr << "Exception: " << e.what() << "\n";
     }
 
-    
     return 0;
 }

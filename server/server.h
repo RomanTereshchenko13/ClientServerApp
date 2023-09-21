@@ -1,11 +1,5 @@
-#pragma once
-
-#include <array>
-#include <fstream>
-#include <string>
-#include <memory>
-#include <boost/asio.hpp>
-#include <filesystem>
+#ifndef SERVER_H
+#define SERVER_H
 
 class Connection
     : public std::enable_shared_from_this<Connection>
@@ -35,7 +29,7 @@ private:
     TcpSocket m_socket;
     enum { MaxLength = 40960 };
     std::array<char, MaxLength> m_buf;
-    boost::asio::streambuf m_requestBuf_;
+    boost::asio::streambuf m_requestBuf;
     std::ofstream m_outputFile;
     size_t m_fileSize;
     std::string m_fileName;
@@ -51,7 +45,7 @@ public:
     using TcpEndPoint = boost::asio::ip::tcp::endpoint;
     using IoContext = boost::asio::io_context;
 
-    Server(IoContext& t_IoContext, std::string const& t_workDirectory);
+    Server(IoContext& t_IoContext);
     void doFileRequestAccept();
 
 private:
@@ -65,3 +59,5 @@ private:
     IoContext& m_ioContext;
     std::string m_workDirectory;
 };
+
+#endif // !SERVER_H

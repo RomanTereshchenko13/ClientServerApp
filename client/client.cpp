@@ -1,7 +1,4 @@
-#include <string>
-#include <iostream>
-
-#include <boost/log/trivial.hpp>
+#include"../shared/pch.h"
 
 #include "client.h"
 
@@ -10,6 +7,7 @@ Client::Client(IoContext& t_IoContext, TcpResolverIterator t_mainEndpointIterato
     : m_TcpResolver(t_IoContext), m_IoContext(t_IoContext), m_mainSocket(t_IoContext), m_fileSocket(t_IoContext),
     m_mainEndpointIterator(t_mainEndpointIterator), m_fileEndpointIterator(t_fileEndpointIterator), m_path(t_path)
 {
+    pathToFiles = fs::current_path().parent_path().string() + "/client/files";
     doConnect();
 }
 
@@ -29,7 +27,7 @@ void Client::doConnect()
             }
         });
 }
-
+//2
 void Client::doFileTransferConnect()
 {
     boost::asio::async_connect(m_fileSocket, m_fileEndpointIterator,
@@ -46,7 +44,7 @@ void Client::doFileTransferConnect()
         });
 }
 
-//2
+//3
 void Client::sendList()
 {
     m_listOfFiles = generateFileList();
@@ -58,20 +56,17 @@ void Client::sendList()
     [this](boost::system::error_code ec, size_t /*length*/) {
         if (!ec) 
         {
-            // Successful write
-            BOOST_LOG_TRIVIAL(info) << "Send list of files:\n" << m_listOfFiles;
+            BOOST_LOG_TRIVIAL(info) << "[Port: 7500] Sent list of files:\n" << m_listOfFiles;
         } else {
-            // Handle error
-            BOOST_LOG_TRIVIAL(error) << "Error sending list of files: " << ec.message();
+            BOOST_LOG_TRIVIAL(error) << "[Port: 7505] Error sending list of files: " << ec.message();
         }
     });
     doFileTransferConnect();
 }
 
-//3
+//4
 std::string Client::generateFileList() {
     std::stringstream fileList;
-    std::string pathToFiles = fs::current_path().string() + "/files_to_send";
     try
     {
         for (const auto& entry : fs::directory_iterator(pathToFiles)) 
@@ -90,11 +85,9 @@ std::string Client::generateFileList() {
     return fileList.str();
 }
 
-//4
+//5
 // Wait for the server's request for a specific file
 void Client::waitForServerRequest() {
-    
-    // Assuming m_request is a boost::asio::streambuf
     boost::asio::async_read_until(m_fileSocket, m_fileRequestBuf, "\n",
         [this](boost::system::error_code ec, size_t /*length*/)
         {
@@ -102,15 +95,12 @@ void Client::waitForServerRequest() {
                 std::istream is(&m_fileRequestBuf);
                 std::string requestedFile;
                 std::getline(is, requestedFile, '\n');
-                // Do something with requestedFile
                 std::cout << "Requested file: " << requestedFile << std::endl;
-
-                // Send the requested file to the server on a different port
-                // Open the file and populate m_request with its contents
-                fs::path fullPath = "files_to_send/" + requestedFile;
-                openFile(fullPath);
+                
+                std::string fullPath = pathToFiles + "/" +  requestedFile;
+                //Begin working with file
                 writeBuffer(m_request);
-                // Send the contents of m_request to the server
+                openFile(fullPath);
             } else {
                 BOOST_LOG_TRIVIAL(error) << "Error: " << ec.message();
             }
@@ -118,7 +108,7 @@ void Client::waitForServerRequest() {
     );
 }
 
-//5
+//6
 void Client::openFile(std::string const &t_path)
 {
     m_sourceFile.open(t_path, std::ios_base::binary | std::ios_base::ate);
@@ -132,10 +122,10 @@ void Client::openFile(std::string const &t_path)
     std::ostream requestStream(&m_request);
     std::filesystem::path p(t_path);
     requestStream << p.filename().string() << "\n" << fileSize << "\n\n";
-    BOOST_LOG_TRIVIAL(trace) << "Request size: " << m_request.size();
+    BOOST_LOG_TRIVIAL(trace) << "[Port: 7505] Request size: " << m_request.size();
 }
 
-//6
+//7
 void Client::doWriteFile(const boost::system::error_code& t_ec)
 {
     if (!t_ec) {
@@ -147,7 +137,7 @@ void Client::doWriteFile(const boost::system::error_code& t_ec)
                 throw std::fstream::failure(msg);
             }
             std::stringstream ss;
-            ss << "Send " << m_sourceFile.gcount() << " bytes, total: "
+            ss << "[Port: 7505] Send " << m_sourceFile.gcount() << " bytes, total: "
                 << m_sourceFile.tellg() << " bytes";
             BOOST_LOG_TRIVIAL(trace) << ss.str();
             std::cout << ss.str() << std::endl;
@@ -156,6 +146,6 @@ void Client::doWriteFile(const boost::system::error_code& t_ec)
             writeBuffer(buf);
         }
     } else {
-        BOOST_LOG_TRIVIAL(error) << "Error: " << t_ec.message();
+        BOOST_LOG_TRIVIAL(error) << "[Port: 7505] Error: " << t_ec.message();
     }
 }

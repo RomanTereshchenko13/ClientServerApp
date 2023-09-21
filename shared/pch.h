@@ -10,13 +10,17 @@
 #include<filesystem>
 #include<fstream>
 #include<random>
+#include <memory>
+#include<array>
+#include<fstream>
 
-#include<boost/serialization/vector.hpp>
-#include<boost/archive/text_oarchive.hpp>
-#include<boost/archive/text_iarchive.hpp>
+
 #include<boost/asio.hpp>
 #include<boost/asio/ts/buffer.hpp>
+#include<boost/asio/read_until.hpp>
+#include<boost/asio/io_context.hpp>
 #include<boost/asio/ts/internet.hpp>
+#include<boost/log/trivial.hpp>
 
 using namespace boost;
 

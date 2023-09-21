@@ -22,11 +22,16 @@ target_link_libraries(client
     Boost::log
     Boost::system
     Boost::thread
-)
+  )
 
 target_compile_options(client
   PUBLIC
     -DBOOST_LOG_DYN_LINK
+  ) 
+
+target_precompile_headers(client
+  PRIVATE 
+    "${CMAKE_CURRENT_SOURCE_DIR}/shared/pch.h"
   )
 
 add_executable(server server/main.cpp server/server.cpp shared/logger.cpp)
@@ -49,4 +54,9 @@ target_link_libraries(server
 target_compile_options(server
   PUBLIC
     -DBOOST_LOG_DYN_LINK
+  )
+
+  target_precompile_headers(server
+  PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/shared/pch.h"
   )

@@ -1,9 +1,7 @@
-#include <iostream>
 
-#include <boost/asio/read_until.hpp>
-#include <boost/log/trivial.hpp>
 #include "server.h"
 
+#include"../shared/pch.h"
 
 Connection::Connection(TcpSocket t_socket)
     : m_socket(std::move(t_socket))
@@ -12,8 +10,9 @@ Connection::Connection(TcpSocket t_socket)
 
 void Connection::doRead()
 {
+    // Send the request to the client.
     auto self = shared_from_this();
-    async_read_until(m_socket, m_requestBuf_, "\n\n",
+    async_read_until(m_socket, m_requestBuf, "\n\n",
         [this, self](boost::system::error_code ec, size_t bytes)
         {
             if (!ec)
@@ -23,18 +22,47 @@ void Connection::doRead()
         });
 }
 
+void Connection::doFileListRead()
+{
+    auto self = shared_from_this();
+    boost::asio::async_read_until(m_socket, m_requestBuf, "\n\n",
+        [this, self](boost::system::error_code ec, size_t bytes)
+        {
+            if (!ec) {
+                handleFileList(bytes);
+            } else {
+                handleError(__FUNCTION__, ec); 
+            }
+        });
+}
+
+void Connection::handleFileList(size_t bytes)
+{
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__ << "(" << bytes << ")" 
+    << ", in_avail = " << m_requestBuf.in_avail() << ", size = " 
+    << m_requestBuf.size() << ", max_size = " << m_requestBuf.max_size() << ".";
+    std::string fileList;
+    std::istream requestStream(&m_requestBuf);
+    while (std::getline(requestStream, fileList, '\t')) 
+    {
+        m_fileList += fileList + '\n';
+        BOOST_LOG_TRIVIAL(trace) << "Read line: " << fileList;
+        if (fileList.empty()) {
+            break;
+        }
+    }
+    
+    std::cout << "List of files received: " << m_fileList << std::endl;
+}
+
 void Connection::processRead(size_t t_bytesTransferred)
 {
    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__ << "(" << t_bytesTransferred << ")" 
-        << ", in_avail = " << m_requestBuf_.in_avail() << ", size = " 
-        << m_requestBuf_.size() << ", max_size = " << m_requestBuf_.max_size() << ".";
+        << ", in_avail = " << m_requestBuf.in_avail() << ", size = " 
+        << m_requestBuf.size() << ", max_size = " << m_requestBuf.max_size() << ".";
 
-    std::istream requestStream(&m_requestBuf_);
+    std::istream requestStream(&m_requestBuf);
     readData(requestStream);
-
-    auto pos = m_fileName.find_last_of('\\');
-    if (pos != std::string::npos)
-        m_fileName = m_fileName.substr(pos + 1);
 
     createFile();
 
@@ -59,7 +87,6 @@ void Connection::processRead(size_t t_bytesTransferred)
 
 void Connection::readData(std::istream &stream)
 {
-    stream >> m_fileName;
     stream >> m_fileSize;
     stream.read(m_buf.data(), 2);
 
@@ -105,11 +132,10 @@ void Connection::handleError(std::string const& t_functionName, boost::system::e
         << t_ec << " " << t_ec.message() << std::endl;
 }
 
-Server::Server(IoContext& t_IoContext, std::string const& t_workDirectory)
+Server::Server(IoContext& t_IoContext)
     : m_socket(t_IoContext), m_ioContext(t_IoContext), m_fileSocket(t_IoContext),
     m_acceptor(t_IoContext, TcpEndPoint(boost::asio::ip::tcp::v4(), 7500)),
-    m_fileRequestAcceptor(t_IoContext, TcpEndPoint(boost::asio::ip::tcp::v4(), 7505)), 
-    m_workDirectory(t_workDirectory)
+    m_fileRequestAcceptor(t_IoContext, TcpEndPoint(boost::asio::ip::tcp::v4(), 7505))
 {
     std::cout << "Server started\n";
 
@@ -122,13 +148,37 @@ Server::Server(IoContext& t_IoContext, std::string const& t_workDirectory)
 void Server::createWorkDirectory()
 {
     namespace fs = std::filesystem;
+    m_workDirectory = fs::current_path().parent_path().string() + "/server/files"; 
     auto currentPath = fs::path(m_workDirectory);
     if (!exists(currentPath) && !create_directory(currentPath))
         BOOST_LOG_TRIVIAL(error) << "Coudn't create working directory: " << m_workDirectory;
     current_path(currentPath);
 }
 
-//2
+void Connection::requestSpecificFile()
+{
+    std::string name;
+    std::cout << "Enter the name of the file to request: ";
+    std::cin >> name;
+    m_fileName = name;
+    // Send the request to the client.
+    boost::asio::async_write(m_socket,
+    boost::asio::buffer(name + "\n\n"),
+    [this](boost::system::error_code ec, size_t /*length*/)
+    {
+        if (!ec) 
+        {
+        } 
+        else 
+        {
+            handleError(__FUNCTION__, ec);
+        }
+    });
+
+    doRead();
+}
+
+//Server methods
 void Server::doAccept()
 {
     m_acceptor.async_accept(m_socket,
@@ -151,54 +201,4 @@ void Server::doFileRequestAccept()
                 std::make_shared<Connection>(std::move(m_fileSocket))->requestSpecificFile();
             doFileRequestAccept();
         });
-}
-
-void Connection::doFileListRead()
-{
-    auto self = shared_from_this();
-    boost::asio::async_read_until(m_socket, m_requestBuf_, "\n\n",
-        [this, self](boost::system::error_code ec, size_t bytes)
-        {
-            if (!ec) {
-                handleFileList(bytes);
-            } else {
-                handleError(__FUNCTION__, ec); 
-            }
-        });
-}
-
-void Connection::handleFileList(size_t bytes)
-{
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__ << "(" << bytes << ")" 
-    << ", in_avail = " << m_requestBuf_.in_avail() << ", size = " 
-    << m_requestBuf_.size() << ", max_size = " << m_requestBuf_.max_size() << ".";
-    std::istream requestStream(&m_requestBuf_);
-    while (std::getline(requestStream, m_fileList)) 
-    {
-        if (m_fileList.empty()) {
-            break;
-        }
-    }
-    std::cout << "Files received: " << m_fileList << std::endl;
-}
-
-void Connection::requestSpecificFile()
-{
-    std::string name;
-    std::cout << "Enter the name of the file to request: ";
-    std::cin >> name;
-    // Send the request to the client.
-    boost::asio::async_write(m_socket,
-    boost::asio::buffer(name + "\n\n"),
-    [this](boost::system::error_code ec, size_t /*length*/)
-    {
-        if (!ec) 
-        {
-            doRead();
-        } 
-        else 
-        {
-            handleError(__FUNCTION__, ec);
-        }
-    });
 }
