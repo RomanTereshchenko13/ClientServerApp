@@ -18,7 +18,7 @@ This repository contains an example of a simple TCP Client-Server application us
 
 ## Clone the repository.
 
-git clone https://github.com/RomanTereshchenko13/ClientServerApp
+    git clone https://github.com/RomanTereshchenko13/ClientServerApp
 
 ## Navigate to the project directory.
 
@@ -34,8 +34,6 @@ git clone https://github.com/RomanTereshchenko13/ClientServerApp
     cmake ..
 
 ## Compile the project.
-
-bash
 
     make
 
