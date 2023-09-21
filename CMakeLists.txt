@@ -1,40 +1,52 @@
-cmake_minimum_required(VERSION 3.15)
-project(ServerClientApp)
+cmake_minimum_required (VERSION 3.12)
 
-# Set C++ standard to C++17
-set(CMAKE_CXX_STANDARD 17)
+project("FileTransfer" CXX)
 
-# Find Boost
-find_package(Boost REQUIRED)
+SET(CMAKE_CXX_STANDARD 17)
+SET(CMAKE_CXX_STANDARD_REQUIRED ON)
+SET(Boost_USE_MULTITHREAD ON)
+FIND_PACKAGE(Boost 1.82.0 REQUIRED COMPONENTS log_setup log system thread)
 
-# Add executable for the server
-add_executable(Server
-    src/server/Server.cpp
-    src/server/Server.h
-    src/server/main.cpp
+add_executable(client client/main.cpp client/client.cpp shared/logger.cpp)
+
+target_include_directories(client
+  PUBLIC
+    ${Boost_INCLUDE_DIRS}
+    "${CMAKE_CURRENT_SOURCE_DIR}/client"
+    "${CMAKE_CURRENT_SOURCE_DIR}/shared"
 )
 
-# Add executable for the client
-add_executable(Client
-    src/client/Client.cpp
-    src/client/Client.h
-    src/client/main.cpp
+target_link_libraries(client
+  PUBLIC
+    Boost::log_setup
+    Boost::log
+    Boost::system
+    Boost::thread
 )
 
-# Include directories for the project
-target_include_directories(Server PRIVATE
-    include
-    src/shared
-)
+target_compile_options(client
+  PUBLIC
+    -DBOOST_LOG_DYN_LINK
+  )
 
-target_include_directories(Client PRIVATE
-    include
-    src/shared
-)
+add_executable(server server/main.cpp server/server.cpp shared/logger.cpp)
 
-# Link Boost to executables
-target_link_libraries(Server PRIVATE Boost::Boost)
-target_link_libraries(Client PRIVATE Boost::Boost)
+target_include_directories(server
+  PUBLIC
+    ${Boost_INCLUDE_DIRS}
+    "${CMAKE_CURRENT_SOURCE_DIR}/server"
+    "${CMAKE_CURRENT_SOURCE_DIR}/shared"
+  )
 
-# Set the output directory for the executables 
-set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR}/bin)
+target_link_libraries(server
+  PUBLIC
+    Boost::log_setup
+    Boost::log
+    Boost::system
+    Boost::thread
+  )
+
+target_compile_options(server
+  PUBLIC
+    -DBOOST_LOG_DYN_LINK
+  )
