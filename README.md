@@ -4,9 +4,9 @@ This repository contains an example of a simple TCP Client-Server application us
 
 # Features
 
-Uses Boost Asio for networking
-Built with CMake
-Includes logging with Boost Log
+- Uses Boost Asio for networking
+- Built with CMake
+- Includes logging with Boost Log
 
 # Requirements
 
