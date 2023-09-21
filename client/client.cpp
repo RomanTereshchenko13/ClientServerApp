@@ -11,7 +11,7 @@ Client::Client(IoContext& t_IoContext, TcpResolverIterator t_mainEndpointIterato
     doConnect();
 }
 
-//1
+//Connection with 7500 port
 void Client::doConnect()
 {
     boost::asio::async_connect(m_mainSocket, m_mainEndpointIterator, 
@@ -27,7 +27,8 @@ void Client::doConnect()
             }
         });
 }
-//2
+
+//Connection with 7505 port
 void Client::doFileTransferConnect()
 {
     boost::asio::async_connect(m_fileSocket, m_fileEndpointIterator,
@@ -44,7 +45,7 @@ void Client::doFileTransferConnect()
         });
 }
 
-//3
+//Places list of files into buffer and sends to server via Port 7500
 void Client::sendList()
 {
     m_listOfFiles = generateFileList();
@@ -58,13 +59,13 @@ void Client::sendList()
         {
             BOOST_LOG_TRIVIAL(info) << "[Port: 7500] Sent list of files:\n" << m_listOfFiles;
         } else {
-            BOOST_LOG_TRIVIAL(error) << "[Port: 7505] Error sending list of files: " << ec.message();
+            BOOST_LOG_TRIVIAL(error) << "[Port: 7500] Error sending list of files: " << ec.message();
         }
     });
     doFileTransferConnect();
 }
 
-//4
+//Iterates over clients directory and assignes all file names into a string
 std::string Client::generateFileList() {
     std::stringstream fileList;
     try
@@ -81,12 +82,11 @@ std::string Client::generateFileList() {
     {
         std::cerr << "Error during creation of list of files: " << ec.what() << '\n';
     }
-    fileList << "\n\n";
+    fileList << "\x04";
     return fileList.str();
 }
 
-//5
-// Wait for the server's request for a specific file
+// Waits for the server's request for a specific file
 void Client::waitForServerRequest() {
     boost::asio::async_read_until(m_fileSocket, m_fileRequestBuf, "\n",
         [this](boost::system::error_code ec, size_t /*length*/)
@@ -99,8 +99,8 @@ void Client::waitForServerRequest() {
                 
                 std::string fullPath = pathToFiles + "/" +  requestedFile;
                 //Begin working with file
-                writeBuffer(m_request);
                 openFile(fullPath);
+                writeBuffer(m_request);
             } else {
                 BOOST_LOG_TRIVIAL(error) << "Error: " << ec.message();
             }
@@ -108,7 +108,9 @@ void Client::waitForServerRequest() {
     );
 }
 
-//6
+
+//Opens a file at the given path and prepares a request stream 
+//containing the file's name and size.
 void Client::openFile(std::string const &t_path)
 {
     m_sourceFile.open(t_path, std::ios_base::binary | std::ios_base::ate);
@@ -125,7 +127,7 @@ void Client::openFile(std::string const &t_path)
     BOOST_LOG_TRIVIAL(trace) << "[Port: 7505] Request size: " << m_request.size();
 }
 
-//7
+//Handles the write operation, reading from the source file and writing the buffer
 void Client::doWriteFile(const boost::system::error_code& t_ec)
 {
     if (!t_ec) {

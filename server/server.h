@@ -15,7 +15,8 @@ public:
     }
 
     void handleFileList(size_t bytes);
-    void requestSpecificFile();
+    void requestFile();
+    std::atomic<bool>& getBoolSent();
 
 private:
     void doRead();
@@ -43,7 +44,10 @@ public:
     using TcpSocket = boost::asio::ip::tcp::socket;
     using TcpAcceptor = boost::asio::ip::tcp::acceptor;
     using TcpEndPoint = boost::asio::ip::tcp::endpoint;
+    using TcpIp = boost::asio::ip::tcp;
     using IoContext = boost::asio::io_context;
+    using Strand = boost::asio::strand<IoContext::executor_type>;
+
 
     Server(IoContext& t_IoContext);
     void doFileRequestAccept();
@@ -54,10 +58,13 @@ private:
 
     TcpSocket m_socket;
     TcpSocket m_fileSocket;
+
     TcpAcceptor m_acceptor;
     TcpAcceptor m_fileRequestAcceptor;
+    
     IoContext& m_ioContext;
     std::string m_workDirectory;
+    Strand strand;
 };
 
 #endif // !SERVER_H
