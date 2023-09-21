@@ -10,9 +10,9 @@ This repository contains an example of a simple TCP Client-Server application us
 
 # Requirements
 
-C++17 compiler
-CMake 3.12 or higher
-Boost Libraries (Asio, Log, etc.)
+- C++17 compiler
+- CMake 3.12 or higher
+- Boost Libraries (Asio, Log, etc.)
 
 # Building the Project
 
