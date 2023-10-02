@@ -124,7 +124,7 @@ void Client::openFile(std::string const &t_path)
     std::ostream requestStream(&m_request);
     std::filesystem::path p(t_path);
     requestStream << p.filename().string() << "\n" << fileSize << "\n\n";
-    BOOST_LOG_TRIVIAL(trace) << "[Port: 7505] Request size: " << m_request.size();
+    BOOST_LOG_TRIVIAL(trace) << "[Port: 7505] Request size: " << m_request.size(); // is it trace?
 }
 
 //Handles the write operation, reading from the source file and writing the buffer

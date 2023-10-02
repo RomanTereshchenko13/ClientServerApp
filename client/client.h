@@ -1,7 +1,8 @@
 #ifndef CLIENT_H
 #define CLIENT_H
 
-namespace fs = std::filesystem;
+namespace fs = std::filesystem; // Will be public
+// It is better to use such in cpp files, while std::filesystem used in headers
 
 class Client
 {
@@ -15,6 +16,7 @@ public:
     TcpResolverIterator t_fileEndpointIterator, std::string const& t_path);
     void sendList();
     void handleServerRequest();
+    // Good incapsulation
 private:
     std::string generateFileList();
     void waitForServerRequest();
@@ -37,7 +39,7 @@ private:
     std::array<char, MessageSize> m_buf;
     boost::asio::streambuf m_request;
     boost::asio::streambuf m_fileRequestBuf;
-    std::ifstream m_sourceFile;
+    std::ifstream m_sourceFile; // Shouldn't be a class member
     std::string m_path;
     std::string m_listOfFiles;
     std::string pathToFiles;

@@ -13,7 +13,7 @@ void Connection::doFileListRead()
 {
     auto self = shared_from_this();
     boost::asio::async_read_until(m_socket, m_requestBuf, "\x04",
-        [this, self](boost::system::error_code ec, size_t bytes)
+        [this, self](boost::system::error_code ec, size_t bytes) // why do we need this and self?
         {
             if (!ec) {
                 handleFileList(bytes);
@@ -47,14 +47,14 @@ void Connection::handleFileList(size_t bytes)
 void Connection::requestFile()
 {
     //Type name of file to request from a client
-    std::string name;
+    std::string name; // Why do we need extra variable?
     std::cout << "Enter the name of the file to request: ";
     std::cin >> name;
-    m_fileName = name;
+    m_fileName = name; // This is separate thread. We may face with race condition
     // Send the request to the client.
-    boost::asio::async_write(m_socket,
+    boost::asio::async_write(m_socket, // allign code
     boost::asio::buffer(name + "\n\n"),
-    [this](boost::system::error_code ec, size_t /*length*/)
+    [this](boost::system::error_code ec, size_t /*length*/) // Better to use std::error_code
     {
         if (!ec) 
         {
@@ -81,6 +81,15 @@ void Connection::doRead()
                 processRead(bytes);
             else
                 handleError(__FUNCTION__, ec);
+
+            /* Alternative look
+            if (ec) {
+                handleError(__FUNCTION__, ec);
+                return;
+            }
+
+            processRead(bytes);
+            */
         });
 }
 
@@ -181,11 +190,12 @@ Server::Server(IoContext& t_IoContext)
 void Server::createWorkDirectory()
 {
     namespace fs = std::filesystem;
-    m_workDirectory = fs::current_path().parent_path().string() + "/server/files"; 
+    // m_workDirectory = fs::current_path().parent_path() / "server/files";
+    m_workDirectory = fs::current_path().parent_path().string() + "/server/files"; // TODO
     auto currentPath = fs::path(m_workDirectory);
     if (!exists(currentPath) && !create_directory(currentPath))
         BOOST_LOG_TRIVIAL(error) << "Coudn't create working directory: " << m_workDirectory;
-    current_path(currentPath);
+    current_path(currentPath); // Why it doesn't requires fs?
 }
 
 //Creates connection with port 7500
@@ -195,9 +205,9 @@ void Server::doAccept()
         [this](boost::system::error_code ec)
     {
         BOOST_LOG_TRIVIAL(trace) << "Accepted client: " << m_socket.remote_endpoint() << 
-        " on :" << m_socket.local_endpoint().port();
+        " on :" << m_socket.local_endpoint().port(); // Log printed before error code checked
         if (!ec)
-            std::make_shared<Connection>(std::move(m_socket))->start();
+            std::make_shared<Connection>(std::move(m_socket))->start(); // looks strange
         doAccept();
     }));
 }

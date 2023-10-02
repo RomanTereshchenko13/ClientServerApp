@@ -22,7 +22,7 @@ int main(int argc, char* argv[])
         auto fileEndpntIterator = resolver.resolve({ address, "7505" });
         Client client(IoContext, mainEndpntIterator, fileEndpntIterator, filePath);
         IoContext.run();
-    } catch (std::fstream::failure& e) {
+    } catch (std::fstream::failure& e) { // fstream errors should be handled in client itself
         std::cerr << e.what() << "\n";
     } catch (std::exception& e) {
         std::cerr << "Exception: " << e.what() << "\n";
